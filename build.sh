@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+#
+#   ██████╗ ██╗   ██╗██╗██╗     ██████╗
+#   ██╔══██╗██║   ██║██║██║     ██╔══██╗
+#   ██████╔╝██║   ██║██║██║     ██║  ██║
+#   ██╔══██╗██║   ██║██║██║     ██║  ██║
+#   ██████╔╝╚██████╔╝██║███████╗██████╔╝
+#   ╚═════╝  ╚═════╝ ╚═╝╚══════╝╚═════╝
+#
+# You will need to download and install the doctl from
+# Digitalocean.
+#
+# For questions and docs contact your friendly
+# neighbourhood Martin.
+#
+# Usage:
+#   -h,H          : Help, shows usage.
+#   -y,Y          : Auto accepts image overwrite and reusing existing build version.
+#   -p, --publish : Publishes the docker image to the do-registry upon build completion.
+#   --kuber       : Updates kubernetes deployment file with the new version.
+#                   NB, requires yq https://mikefarah.gitbook.io/yq/.
+#   --node        : Updates package json with the new version number.
+#                   NB, requires jq https://stedolan.github.io/jq/.
+#   --kpub,kpop   : Applies the kubernetes deployment changes with kubectl.
+#                   This requires kubectl to be installed and configured with
+#                   the correct kubernetes cluster.
+#  --tag          : Add and commits the updated resources post build, pushes the commit,"
+#                 : and finally tags and pushes this final commit with the new version"
+#   v, version    : Displays the last built and published version name according to this repo.
+# TODO:: Add warning for changed files not commited.
+
+old_img=$(yq e '.spec.template.spec.containers[0].image' ./kubernetes/deployment.yml)
+# shellcheck disable=SC2001
+old_img=$(echo "$old_img" | sed "s/.*://g")
+
+# TODO:: Support multiple env files
+if [ -f ".build.env" ]; then
+  source .build.env
+fi
+
+function help() {
+  echo
+  echo
+  echo "    ██████╗ ██╗   ██╗██╗██╗     ██████╗"
+  echo "    ██╔══██╗██║   ██║██║██║     ██╔══██╗"
+  echo "    ██████╔╝██║   ██║██║██║     ██║  ██║"
+  echo "    ██╔══██╗██║   ██║██║██║     ██║  ██║"
+  echo "    ██████╔╝╚██████╔╝██║███████╗██████╔╝"
+  echo "    ╚═════╝  ╚═════╝ ╚═╝╚══════╝╚═════╝"
+  echo ""
+  echo "        © 2022 Indico Systems AS"
+  echo "           All rights reserved"
+  echo ""
+  echo "A simple helper script for building and publishing almost"
+  echo "all indico software. The usage of this script is the same"
+  echo "across all repositories, and requires doctl from Digitalocean"
+  echo "for publishing to work. For more information, questions"
+  echo "or documentation pleas contact your friendly neighbourhood"
+  echo "Martin."
+  echo ""
+  echo "Eks: ./build.sh 0.1.5-beta.5 -p --kuber --node --kpub -y"
+  echo ""
+  echo "Usage:      "
+  echo "  -h,H          : Help, shows usage."
+  echo "  -y,Y          : Auto accepts image overwrite and reusing existing build version."
+  echo "  -p, --publish : Publishes the docker image to the do-reguistry upon build completion"
+  echo "  --kuber       : updates kubernetes deployment file with the new version."
+  echo "                  NB, requires yq https://mikefarah.gitbook.io/yq/"
+  echo "  --node        : Updates package json with the new version number."
+  echo "                  NB, requires jq https://stedolan.github.io/jq/"
+  echo "  --kpub,kpop   : Applies the kubernetes deployment changes with kubectl."
+  echo "                  This requires kubectl to be installed and configured with"
+  echo "                  the correct kubernetes cluster. Remember to sett the correct namespace"
+  echo "  --tag         : Add and commits the updated resources post build, pushes the commit,"
+  echo "                : and finally tags and pushes this final commit with the new version"
+  echo "  v, version    : Displays the last built and published version name according to this repo."
+  echo " "
+}
+
+# Safety
+if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
+  help
+  exit 0
+fi
+
+for arg in "$@"; do
+  case "$arg" in
+  --kpop | --kpub)
+    export BUILD_IMAGE_KPUB=1
+    ;;
+  --node)
+    export BUILD_IMAGE_NODE=1
+    ;;
+  --kuber)
+    export BUILD_IMAGE_KUBER=1
+    ;;
+  --publish | -p)
+    export BUILD_IMAGE_PUBLISH=1
+    ;;
+  -[yY])
+    export BUILD_ALLOW=1
+    ;;
+  -[hH])
+    help
+    exit 0
+    ;;
+  --tag)
+    export BUILD_GIT_TAG=1
+    ;;
+  v | version)
+    echo "Last built version was $old_img"
+    exit 0
+    ;;
+  --version|-v)
+    echo $old_img
+    exit 0
+    ;;
+  *)
+    next_version=$arg
+    ;;
+  esac
+done
+
+function yesNo() {
+  [ "$BUILD_ALLOW" -eq 1 ] && return 0
+  read -r -p "$1 [Y/n]: " input
+  case $input in
+  [yY][eE][sS] | [yY])
+    return 0
+    ;;
+  esac
+  return 1
+}
+
+if [ "$BUILD_IMAGE_PUBLISH" -eq 1 ]; then
+  echo "### Connecting to digital digitalocean"
+  doctl registry login || exit 1
+  echo
+fi
+
+echo "### Resolving image version"
+if [ -n "$next_version" ]; then
+  export BUILD_IMAGE_VERSION="$next_version"
+fi
+
+while [ -z "$BUILD_IMAGE_VERSION" ]; do
+  echo " - error: invalid image version"
+  read -r -p "Set the new image version formatted like \"$old_img\": " BUILD_IMAGE_VERSION
+done
+
+while [ -n "$(docker images -q "$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION")" ]; do
+  yesNo " - error: image version ($BUILD_IMAGE_VERSION) already exist, overwrite?" && break
+  read -r -p "Set the new image version formatted like \"$old_img\": " BUILD_IMAGE_VERSION
+done
+
+BUILD_IMAGE_VERSION=${BUILD_IMAGE_VERSION/$'\r'/}
+BUILD_IMAGE_NAME=${BUILD_IMAGE_NAME/$'\r'/}
+
+echo " - Using image version: $BUILD_IMAGE_VERSION"
+echo "   "
+
+# Custom for this script, TODO:: Remove this on copy
+echo "### Updating in-app version"
+if sed -i -e "s/<code.*id=\"app-version\">.*<\/code>/<code id=\"app-version\">$BUILD_IMAGE_VERSION<\/code>/g" ./src/lib/Sidebar.svelte; then
+  echo " - version updated in ./src/lib/Sidebar.svelte"
+else
+  echo " - error: failed to update version in ./src/lib/Sidebar.svelte"
+  exit 1
+fi
+echo " "
+
+if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
+  echo "### Updating node version"
+  curr_date=$(date +"%Y-%m-%d")
+  contents=$(jq --arg vs "$BUILD_IMAGE_VERSION" --arg date "$curr_date" '.version = $vs | .versionDate = $date' package.json)
+  echo "${contents}" >package.json
+  echo " - updated date and version in package.json"
+  echo " "
+fi
+
+echo "### Running yarn build"
+if ! yarn install; then
+  echo " - error: failed to install packages"
+  exit 1
+fi
+
+if ! yarn build; then
+  echo " - error: failed to build svelte app"
+  exit 1
+fi
+echo " "
+
+echo "### Building \"$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION\""
+if ! docker build -t "$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION" .; then
+  echo " - error: build failed."
+  exit 1
+fi
+printf "\n"
+
+if [ "$BUILD_IMAGE_PUBLISH" -eq 1 ]; then
+
+  export BUILD_IMAGE_NEXT="$BUILD_REGISTRY_NAME/$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION"
+
+  echo "### Tagging the freshly made image"
+  docker tag "$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION" "$BUILD_IMAGE_NEXT"
+  echo " - tagged: $BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION"
+  echo " - tagged: $BUILD_IMAGE_NEXT"
+  printf "\n"
+
+  echo "### Publishing image to $BUILD_REGISTRY_NAME"
+  docker push "$BUILD_IMAGE_NEXT"
+  printf "\n"
+
+fi
+
+if [ "$BUILD_IMAGE_KUBER" -eq 1 ]; then
+  echo "### Updating image version"
+  if yq e -i '.spec.template.spec.containers[0].image = strenv(BUILD_IMAGE_NEXT)' ./kubernetes/deployment.yml; then
+    echo " - updated deployment.yml"
+  else
+    exit 1
+  fi
+  echo ""
+fi
+
+# TODO::Be carefull when using this!
+# Performing the actual publishing step requires kubectl
+# to be installed and configured both with the do-container-registry
+# and a deployment cluster. Contact your friendly neighbourhood Martin
+# if you wish to learn more or configure this.
+
+if [ "$BUILD_IMAGE_KPUB" -eq 1 ]; then
+  echo "### Deploying to kubernetes"
+  BUILD_KUBE_CONTEXT_CURRENT="$(kubectl config current-context)"
+  if [ -n "$BUILD_KUBE_CONTEXT" ] && [ "$BUILD_KUBE_CONTEXT_CURRENT" != "$BUILD_KUBE_CONTEXT" ]; then
+    echo " - ensuring correct context \"dploy\""
+    printf " - $(kubectl config use-context "${BUILD_KUBE_CONTEXT}")\n"
+  fi
+  echo " - $(kubectl apply -f ./kubernetes/deployment.yml)"
+  if [ -n "$BUILD_KUBE_CONTEXT_CURRENT" ] && [ "$BUILD_KUBE_CONTEXT_CURRENT" != "$BUILD_KUBE_CONTEXT" ]; then
+    echo " - returning to previous context \"${BUILD_KUBE_CONTEXT_CURRENT}\""
+    printf " - $(kubectl config use-context "${BUILD_KUBE_CONTEXT_CURRENT}")\n"
+  fi
+  echo " "
+fi
+
+if [ "$BUILD_GIT_TAG" -eq 1 ]; then
+  echo "### Publishing changes to git"
+  printf " - adding changed files"
+  if git add . &>/dev/null; then
+    printf ": success\n"
+  else
+    printf ": failed\n"
+    exit 1
+  fi
+  printf " - commit changed files"
+  if [ -z "$BUILD_GIT_MESSAGE" ]; then
+    export BUILD_GIT_MESSAGE="built new version"
+  fi
+  if git commit -m "${BUILD_GIT_MESSAGE}" &>/dev/null; then
+    printf ": success\n"
+  else
+    printf ": failed\n"
+    exit 1
+  fi
+  printf " - tagging commit \"$BUILD_IMAGE_VERSION\""
+  if git tag -f "$BUILD_IMAGE_VERSION" &>/dev/null; then
+    printf ": success\n"
+  else
+    printf ": failed\n"
+    exit 1
+  fi
+  printf " - pushing changes"
+  if git push --all &>/dev/null; then
+    printf ": success\n"
+  else
+    printf ": failed\n"
+    exit 1
+  fi
+  echo " "
+fi
+
+exit 0
