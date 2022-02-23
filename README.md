@@ -81,11 +81,12 @@ for arg in "$@"; do #Itterates arguments passed to the script
   esac
 done
 
-if [ -z "$next_version" ]; then
+if [ -z "$next_version" ]; then # Checks if the next version has been sat
   echo " - error: You need specify a version to update it..."
   exit 1
 fi
 
+# The info file in FT4 is not interest in the `Tag.Number` part of the version, so we strip this away.
 echo " - Stripping version flags"
 next_version=(${next_version//-/" "})
 next_version="${next_version[0]}"
@@ -99,7 +100,7 @@ if ! [[ "$next_version" =~ ^[0-9]\.[0-9]\.[0-9]$ ]]; then
   echo " - error: Invalid version format \"$next_version, should be \"0.1.0\""
 fi
 
-if [ ! -f "$FT4_INFO_PATH" ]; then
+if [ ! -f "$FT4_INFO_PATH" ]; then # Checks if the info file exists at the given location in .build.env
   echo " - error: no FT4 info can be found at $FT4_INFO_PATH ..."
   exit 1
 fi
@@ -108,7 +109,7 @@ vs_seg=(${next_version//./" "})
 
 echo " - Updating $FT4_INFO_PATH to version $next_version"
 
-function update_vs() {
+function update_vs() { # Performers the actual version update with jq
   jq \
     --arg major "${vs_seg[0]}" \
     --arg minor "${vs_seg[1]}" \
@@ -119,11 +120,83 @@ function update_vs() {
 }
 
 vs=$(update_vs)
-echo "$vs" > "$FT4_INFO_PATH"
+echo "$vs" > "$FT4_INFO_PATH" # Saves the new version to the info.json file
 
 echo " - Version updated to $next_version"
 exit 0
 ```
+The simplified `package.json` used by __FT4__:
+```shell
+{
+  "name": "ft4", # Lower-case public name.
+  "version": "0.9.8-beta.46", # The full version.
+  "versionDate": "2022-02-18" # Date when the version was last updated.
+}
+```
+
+## Project structure
+To improve readability and streamline image building and kubernetes deployment automation we should strive as much as
+possible to maintain the same project structure across all container-based projects. If the project is using a package
+manager or framework, chances are that the project is already following the best practices for `project-structure`. Only
+a few older solutions still stuck in time deviates from this. 
+
+Furthermore, the projects should contain one project and one project only. When developing for a container-based 
+environment the final deployment does only work with one single foreground runner. This means that after the pod
+starts up it is tied to s single executable which it also binds its lifecycle to. Resulting in the pod stopping when
+the executable completes or crashes.
+
+A well-structured project should look something like this:
+![img.png](assets/project_structure_1.png)
+
+From the above picture we find all configurations, external scripts and assets at root level. While all code lives in 
+the `src` folder, this folder could be given any name as long as it hits towards containing the source code for the 
+project. Commonly used names are `src` or `app`. Following this approach increases readability and allows us to easily 
+locate cache folders and personal configurations or environment files. 
+
+In the root of all projects as with the example above we find the `package.json` which is the default project-descriptor
+and versioning file for all Indico projects per `23.02.22`. The contents of said file looks something like this: 
+```json
+{
+  "name": "dploy",
+  "version": "0.1.13",
+  "versionDate": "2022-02-23",
+  ...
+}
+```
+Here we can easily determine the version, last updated version data, and project name from the file. Internal Indico 
+scripts such as `build.sh` utilize this to update and parse versions for the project by default. 
+
+### Kubernetes
+Projects that are hosted in _Kubernetes_ have a special folder `kubernets` at project root. This is where all `.yaml`
+files related to the running deployment are stored. For the [dploy](https://github.com/IndicoSystems/dploy) repository
+the content of the `kubernetes` folder looks like this:
+![img.png](assets/project_structure_kubernetes.png)
+
+The files in the above image is always the currently deployed files for the project in _Kubernetes_. As they are kept
+in the project root and in the same repository as the project itself, it forces the developer to always commit 
+changes made to the `.yaml` files to the remote. This in turn ensures that everyone is working on the same version of
+the _Kubernetes_ resources when making changes in _Kubernetes_. Finally, internal Indico scripts such as `build.sh` 
+utilizes this to automatically update the images used by `kubernetes/deployment.yaml` when the following two flags are 
+sat:
+```env
+# Enables kubernetes publishing
+BUILD_IMAGE_KPUB=1
+# Enables kubernetes deployment update with new image version
+BUILD_IMAGE_KUBER=1
+```
 
 ## build.sh
-build.sh is a simple bash-script that is to be added into the root of any container-based Indico-project. 
+build.sh is a simple bash-script that is to be added into the root of any container-based Indico-project.
+
+```shell
+
+# Shared version update logic
+if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
+  echo "### Updating node version"
+  curr_date=$(date +"%Y-%m-%d") #Retrieves the current date
+  contents=$(jq --arg vs "$BUILD_IMAGE_VERSION" --arg date "$curr_date" '.version = $vs | .versionDate = $date' package.json) #Updates the new version in package json
+  echo "${contents}" >package.json
+  echo " - updated date and version in package.json"
+  echo " "
+fi
+```
