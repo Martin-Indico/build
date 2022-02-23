@@ -145,7 +145,8 @@ environment the final deployment does only work with one single foreground runne
 starts up it is tied to s single executable which it also binds its lifecycle to. Resulting in the pod stopping when
 the executable completes or crashes.
 
-A well-structured project should look something like this:
+A well-structured project should look something like this:  
+
 ![img.png](assets/project_structure_1.png)
 
 From the above picture we find all configurations, external scripts and assets at root level. While all code lives in 
@@ -169,7 +170,8 @@ scripts such as `build.sh` utilize this to update and parse versions for the pro
 ### Kubernetes
 Projects that are hosted in _Kubernetes_ have a special folder `kubernets` at project root. This is where all `.yaml`
 files related to the running deployment are stored. For the [dploy](https://github.com/IndicoSystems/dploy) repository
-the content of the `kubernetes` folder looks like this:
+the content of the `kubernetes` folder looks like this:  
+
 ![img.png](assets/project_structure_kubernetes.png)
 
 The files in the above image is always the currently deployed files for the project in _Kubernetes_. As they are kept
