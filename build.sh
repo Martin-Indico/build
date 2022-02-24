@@ -38,7 +38,7 @@ if [ -f ".build.env" ]; then
   source .build.env
 fi
 
-function help() {
+function header() {
   echo
   echo
   echo "    ██████╗ ██╗   ██╗██╗██╗     ██████╗"
@@ -51,17 +51,30 @@ function help() {
   echo "        © 2022 Indico Systems AS"
   echo "           All rights reserved"
   echo ""
+}
+
+function help() {
+  header
   echo "A simple helper script for building and publishing almost"
   echo "all indico software. The usage of this script is the same"
-  echo "across all repositories, and requires doctl from Digitalocean"
-  echo "for publishing to work. For more information, questions"
-  echo "or documentation pleas contact your friendly neighbourhood"
-  echo "Martin."
+  echo "across all repositories, and it depends on doctl and docker"
+  echo "For more information, questions or documentation pleas"
+  echo "contact your friendly neighbourhood Martin."
+  echo ""
+  echo "Requirements:"
+  echo " - doctl : DigitalOcean command line interface, see install"
+  echo "           guide at https://dploy.indico.dev/#/digitalocean"
+  echo " - docker: Docker runner, for windows this should be Docker-"
+  echo "           Desktop, guide at https://dploy.indico.dev/#/docker"
+  echo " - jq:   : Json command line parser, required to update version"
+  echo "         : see docs to install https://stedolan.github.io/jq/"
   echo ""
   echo "Eks: ./build.sh 0.1.5-beta.5 -p --kuber --node --kpub -y"
   echo ""
   echo "Usage:      "
   echo "  -h,H          : Help, shows usage."
+  echo "  --help        : Opens the full documentation page for this script at"
+  echo "                  https://dploy.indico.dev/#/build."
   echo "  -y,Y          : Auto accepts image overwrite and reusing existing build version."
   echo "  -p, --publish : Publishes the docker image to the do-reguistry upon build completion"
   echo "  --kuber       : updates kubernetes deployment file with the new version."
@@ -76,6 +89,22 @@ function help() {
   echo "  v, version    : Displays the last built and published version name according to this repo."
   echo " "
 }
+
+open_url() {
+  url="$1"
+  xdg-open $url 2>/dev/null && return 0
+  open $url 2>/dev/null && return 0
+  start $url 2>/dev/null && return 0
+  return 1
+}
+
+if ! docker ps &>/dev/null; then
+  header
+  echo " - error: Failed to connect to docker, ensure that docker is running."
+  echo "          For more info on installing and running docker se the guide"
+  echo "          at https://dploy.indico.dev/#/docker"
+  exit 1
+fi
 
 # Safety
 if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
@@ -102,6 +131,10 @@ for arg in "$@"; do
     ;;
   -[hH])
     help
+    exit 0
+    ;;
+  --help)
+    open_url "https://dploy.indico.dev/#/build"
     exit 0
     ;;
   --tag)
@@ -159,36 +192,40 @@ BUILD_IMAGE_NAME=${BUILD_IMAGE_NAME/$'\r'/}
 echo " - Using image version: $BUILD_IMAGE_VERSION"
 echo "   "
 
-# Custom for this script, TODO:: Remove this on copy
-echo "### Updating in-app version"
-if sed -i -e "s/<code.*id=\"app-version\">.*<\/code>/<code id=\"app-version\">$BUILD_IMAGE_VERSION<\/code>/g" ./src/lib/Sidebar.svelte; then
-  echo " - version updated in ./src/lib/Sidebar.svelte"
-else
-  echo " - error: failed to update version in ./src/lib/Sidebar.svelte"
-  exit 1
-fi
-echo " "
-
-if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
-  echo "### Updating node version"
-  curr_date=$(date +"%Y-%m-%d")
-  contents=$(jq --arg vs "$BUILD_IMAGE_VERSION" --arg date "$curr_date" '.version = $vs | .versionDate = $date' package.json)
-  echo "${contents}" >package.json
-  echo " - updated date and version in package.json"
+if [ -n "$BUILD_ADDITIONAL_VERSION" ]; then
+  echo "### Updating additional version"
+  if $BUILD_ADDITIONAL_VERSION; then
+    echo " - updated additional version."
+  else
+    echo " - error: failed to update additional version"
+    exit 1
+  fi
   echo " "
 fi
 
-echo "### Running yarn build"
-if ! yarn install; then
-  echo " - error: failed to install packages"
-  exit 1
+if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
+  echo "### Updating node version"
+  if [ ! -f "$BUILD_PROJECT_FILE" ]; then
+    echo " - error: failed to locate project version file at $BUILD_PROJECT_FILE"
+    exit 1
+  fi
+  curr_date=$(date +"%Y-%m-%d")
+  contents=$(jq --arg vs "$BUILD_IMAGE_VERSION" --arg date "$curr_date" '.version = $vs | .versionDate = $date' "$BUILD_PROJECT_FILE")
+  echo "${contents}" >"$BUILD_PROJECT_FILE"
+  echo " - updated date and version in $BUILD_PROJECT_FILE"
+  echo " "
 fi
 
-if ! yarn build; then
-  echo " - error: failed to build svelte app"
-  exit 1
+if [ -n "$BUILD_EXEC" ]; then
+  echo "### Running Build Exec"
+  if $BUILD_EXEC; then
+    echo " - build exec completed."
+  else
+    echo " - error: build exec failed"
+    exit 1
+  fi
+  echo ""
 fi
-echo " "
 
 echo "### Building \"$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION\""
 if ! docker build -t "$BUILD_IMAGE_NAME:$BUILD_IMAGE_VERSION" .; then
