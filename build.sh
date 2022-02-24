@@ -98,20 +98,6 @@ open_url() {
   return 1
 }
 
-if ! docker ps &>/dev/null; then
-  header
-  echo " - error: Failed to connect to docker, ensure that docker is running."
-  echo "          For more info on installing and running docker se the guide"
-  echo "          at https://dploy.indico.dev/#/docker"
-  exit 1
-fi
-
-# Safety
-if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
-  help
-  exit 0
-fi
-
 for arg in "$@"; do
   case "$arg" in
   --kpop | --kpub)
@@ -153,6 +139,21 @@ for arg in "$@"; do
     ;;
   esac
 done
+
+# Check if docker is running
+if ! docker ps &>/dev/null; then
+  header
+  echo " - error: Failed to connect to docker, ensure that docker is running."
+  echo "          For more info on installing and running docker se the guide"
+  echo "          at https://dploy.indico.dev/#/docker"
+  exit 1
+fi
+
+# Safety
+if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
+  help
+  exit 0
+fi
 
 function yesNo() {
   [ "$BUILD_ALLOW" -eq 1 ] && return 0
