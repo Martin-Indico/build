@@ -172,6 +172,9 @@ function yesNo() {
   return 1
 }
 
+# Starts the actual build
+header
+
 if [ "$BUILD_IMAGE_PUBLISH" -eq 1 ]; then
   echo "### Connecting to digital digitalocean"
   doctl registry login || exit 1
