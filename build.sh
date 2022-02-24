@@ -75,18 +75,23 @@ function help() {
   echo "  -h,H          : Help, shows usage."
   echo "  --help        : Opens the full documentation page for this script at"
   echo "                  https://dploy.indico.dev/#/build."
-  echo "  -y,Y          : Auto accepts image overwrite and reusing existing build version."
-  echo "  -p, --publish : Publishes the docker image to the do-reguistry upon build completion"
+  echo "  -y,Y          : Auto accepts image overwrite and reusing existing"
+  echo "                  build version."
+  echo "  -p, --publish : Publishes the docker image to the do-reguistry upon "
+  echo "                  build completion"
   echo "  --kuber       : updates kubernetes deployment file with the new version."
   echo "                  NB, requires yq https://mikefarah.gitbook.io/yq/"
   echo "  --node        : Updates package json with the new version number."
   echo "                  NB, requires jq https://stedolan.github.io/jq/"
   echo "  --kpub,kpop   : Applies the kubernetes deployment changes with kubectl."
   echo "                  This requires kubectl to be installed and configured with"
-  echo "                  the correct kubernetes cluster. Remember to sett the correct namespace"
-  echo "  --tag         : Add and commits the updated resources post build, pushes the commit,"
-  echo "                : and finally tags and pushes this final commit with the new version"
-  echo "  v, version    : Displays the last built and published version name according to this repo."
+  echo "                  the correct kubernetes cluster. Remember to sett the "
+  echo "                  correct namespace"
+  echo "  --tag         : Add and commits the updated resources post build, pushes"
+  echo "                  the commit, and finally tags and pushes this final commit"
+  echo "                  with the new version."
+  echo "  v, version    : Displays the last built and published version name according"
+  echo "                  to this repo."
   echo " "
 }
 
@@ -97,6 +102,12 @@ open_url() {
   start $url 2>/dev/null && return 0
   return 1
 }
+
+# Checks for minimum required environment
+if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
+  help
+  exit 0
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -147,12 +158,6 @@ if ! docker ps &>/dev/null; then
   echo "          For more info on installing and running docker se the guide"
   echo "          at https://dploy.indico.dev/#/docker"
   exit 1
-fi
-
-# Safety
-if [[ $# -lt 1 ]] && [ -z "$BUILD_IMAGE_VERSION" ] || [ -z "$BUILD_REGISTRY_NAME" ] || [ -z "$BUILD_IMAGE_NAME" ]; then
-  help
-  exit 0
 fi
 
 function yesNo() {
