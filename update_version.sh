@@ -11,7 +11,7 @@ for arg in "$@"; do
     ;;
   esac
 done
-# Safety for checking that the version has acualy been sat.
+# Safety for checking that the version has actually been sat.
 if [ -z "$next_version" ]; then
   echo " - error: You need specify a version to update it..."
   exit 1
