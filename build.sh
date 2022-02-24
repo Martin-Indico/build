@@ -177,7 +177,7 @@ header
 
 if [ "$BUILD_IMAGE_PUBLISH" -eq 1 ]; then
   echo "### Connecting to digital digitalocean"
-  doctl registry login || exit 1
+  (doctl registry login | sed -e 's/^/ - /;') || exit 1
   echo
 fi
 
@@ -255,9 +255,11 @@ if [ "$BUILD_IMAGE_PUBLISH" -eq 1 ]; then
   printf "\n"
 
   echo "### Publishing image to $BUILD_REGISTRY_NAME"
-  docker push "$BUILD_IMAGE_NEXT"
-  printf "\n"
-
+  if ! docker push "$BUILD_IMAGE_NEXT" | sed -e 's/^/ - /;'; then
+    echo " - error: failed to push docker image"
+    exit 1
+  fi
+  echo ""
 fi
 
 if [ "$BUILD_IMAGE_KUBER" -eq 1 ]; then
@@ -283,10 +285,10 @@ if [ "$BUILD_IMAGE_KPUB" -eq 1 ]; then
     echo " - ensuring correct context \"dploy\""
     printf " - $(kubectl config use-context "${BUILD_KUBE_CONTEXT}")\n"
   fi
-  echo " - $(kubectl apply -f ./kubernetes/deployment.yml)"
+  kubectl apply -f ./kubernetes/deployment.yml | sed -e 's/^/ - /;'
   if [ -n "$BUILD_KUBE_CONTEXT_CURRENT" ] && [ "$BUILD_KUBE_CONTEXT_CURRENT" != "$BUILD_KUBE_CONTEXT" ]; then
     echo " - returning to previous context \"${BUILD_KUBE_CONTEXT_CURRENT}\""
-    printf " - $(kubectl config use-context "${BUILD_KUBE_CONTEXT_CURRENT}")\n"
+    kubectl config use-context "${BUILD_KUBE_CONTEXT_CURRENT}" | sed -e 's/^/ - /;'
   fi
   echo " "
 fi
