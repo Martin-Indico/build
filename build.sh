@@ -204,7 +204,7 @@ echo "   "
 
 if [ -n "$BUILD_ADDITIONAL_VERSION" ]; then
   echo "### Updating additional version"
-  if $BUILD_ADDITIONAL_VERSION; then
+  if $BUILD_ADDITIONAL_VERSION "$BUILD_IMAGE_VERSION"; then
     echo " - updated additional version."
   else
     echo " - error: failed to update additional version"
