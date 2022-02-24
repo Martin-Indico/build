@@ -188,7 +188,17 @@ BUILD_IMAGE_KUBER=1
 ```
 
 ## build.sh
-build.sh is a simple bash-script that is to be added into the root of any container-based Indico-project.
+build.sh is a simple bash-script that is to be added into the root of any container-based Indico-project. The intention
+of this script is to simplify the way _Docker-Images_ are built and published. In addition, the script also
+updates project versions and commits the final result for _Git_ on a successful build.
+
+For the script to work properly you will have to follow the above project structure and versioning guidelines. With 
+your container-based project structured correctly, you download and configure the `.build.env` from this repo.
+
+### .build.env
+
+guidelines for good project structure mentioned above, this script capable of updating project versions, build it's 
+source-code, building a docker image of the `Dockerfile`
 
 ```shell
 
@@ -202,3 +212,13 @@ if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
   echo " "
 fi
 ```
+
+### Docker
+If any errors should appear related to the docker build-step, or something seems fishy after the build has completed, 
+you can run the following command to remove all previously cached docker images:
+```shell
+docker rmi -f $(docker images -q -a)
+```
+
+If the errors persist try removing the latter `FROM` parts from the `Dockerfile`, run the above command again, and then
+try rebuilding the image.
