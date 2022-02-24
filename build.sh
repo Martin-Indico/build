@@ -6,28 +6,14 @@
 #   ██╔══██╗██║   ██║██║██║     ██║  ██║
 #   ██████╔╝╚██████╔╝██║███████╗██████╔╝
 #   ╚═════╝  ╚═════╝ ╚═╝╚══════╝╚═════╝
+#       © 2022 Indico Systems AS
+#          All rights reserved
 #
-# You will need to download and install the doctl from
-# Digitalocean.
-#
-# For questions and docs contact your friendly
-# neighbourhood Martin.
-#
-# Usage:
-#   -h,H          : Help, shows usage.
-#   -y,Y          : Auto accepts image overwrite and reusing existing build version.
-#   -p, --publish : Publishes the docker image to the do-registry upon build completion.
-#   --kuber       : Updates kubernetes deployment file with the new version.
-#                   NB, requires yq https://mikefarah.gitbook.io/yq/.
-#   --node        : Updates package json with the new version number.
-#                   NB, requires jq https://stedolan.github.io/jq/.
-#   --kpub,kpop   : Applies the kubernetes deployment changes with kubectl.
-#                   This requires kubectl to be installed and configured with
-#                   the correct kubernetes cluster.
-#  --tag          : Add and commits the updated resources post build, pushes the commit,"
-#                 : and finally tags and pushes this final commit with the new version"
-#   v, version    : Displays the last built and published version name according to this repo.
-# TODO:: Add warning for changed files not commited.
+# A simple helper script for building and publishing almost
+# all indico software. The usage of this script is the same
+# across all repositories, and it depends on doctl and docker
+# For more information, questions or documentation pleas
+# contact your friendly neighbourhood Martin.
 
 old_img=$(yq e '.spec.template.spec.containers[0].image' ./kubernetes/deployment.yml)
 # shellcheck disable=SC2001
