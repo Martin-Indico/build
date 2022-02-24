@@ -92,6 +92,7 @@ function help() {
   echo "                  with the new version."
   echo "  v, version    : Displays the last built and published version name according"
   echo "                  to this repo."
+  echo "  -v,--version  : Displays the last built version, and just the version."
   echo " "
 }
 
