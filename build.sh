@@ -15,7 +15,13 @@
 # For more information, questions or documentation pleas
 # contact your friendly neighbourhood Martin.
 
-old_img=$(yq e '.spec.template.spec.containers[0].image' ./kubernetes/deployment.yml)
+# Defaults
+# The location of package.json or version file of same format, usually "./package.json"
+BUILD_PROJECT_FILE="./package.json"
+# The docker container registry to push to
+BUILD_REGISTRY_NAME="registry.digitalocean.com/indico"
+# Retrieve current version
+old_img=$(jq -r '.version' "$BUILD_PROJECT_FILE")
 # shellcheck disable=SC2001
 old_img=$(echo "$old_img" | sed "s/.*://g")
 
