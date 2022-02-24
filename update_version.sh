@@ -20,8 +20,9 @@ fi
 # Actual version update logic, return 0 on success and 1 on error
 if sed -i -e "s/<code.*id=\"app-version\">.*<\/code>/<code id=\"app-version\">$BUILD_IMAGE_VERSION<\/code>/g" ./src/lib/Sidebar.svelte; then
   echo " - version updated in ./src/lib/Sidebar.svelte"
-  return 0
 else
   echo " - error: failed to update version in ./src/lib/Sidebar.svelte"
   exit 1
 fi
+
+exit 0
