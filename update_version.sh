@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # Loads the .build.env file
 if [ -f ".build.env" ]; then
   source .build.env
@@ -24,5 +23,5 @@ else
   echo " - error: failed to update version in ./src/lib/Sidebar.svelte"
   exit 1
 fi
-
+# Reports success and close
 exit 0
