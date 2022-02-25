@@ -24,6 +24,7 @@ BUILD_REGISTRY_NAME="registry.digitalocean.com/indico"
 old_img=$(jq -r '.version' "$BUILD_PROJECT_FILE")
 # shellcheck disable=SC2001
 old_img=$(echo "$old_img" | sed "s/.*://g")
+old_date=$(jq -r '.versionDate' "$BUILD_PROJECT_FILE")
 
 # TODO:: Support multiple env files
 if [ -f ".build.env" ]; then
@@ -131,7 +132,7 @@ for arg in "$@"; do
     export BUILD_GIT_TAG=1
     ;;
   v | version)
-    echo "Last built version was $old_img"
+    echo "Last version updated at $old_date, to version $old_img"
     exit 0
     ;;
   --version|-v)
