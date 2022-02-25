@@ -349,9 +349,15 @@ specified with `BUILD_REGISTRY_NAME`.
 #### BUILD_GIT_TAG
 Enabling this will on a successful build commit the changed files with the message sat to `BUILD_GIT_MESSAGE`. Then it
 will push this commit to the repo, and finally create and publish a _Git-tag_ at the same point with the new version 
-name. When using this remember to always commit and push all code related changes, see the [Git guide](https://dploy.indico.dev/#/kubernetes) 
+name. When using this, remember to always commit and push all code related changes, see the [Git guide](https://dploy.indico.dev/#/kubernetes) 
 for best precises around this. This is highly recommended using as it ensures that there is always a versioned 
-_Git-tag_ matching the image-version-name in the git history.
+_Git-tag_ matching the image-version-name in the git history. 
+
+> Pushing new tags and commits to server will not succeed as long as there is warning present in git. This is default
+> behaviour for Git and should not be changed, but rather fixed or ignored before committing and running `build.sh`.
+> For `build.sh` there is no problem in push step failing as the commits and tags are stored in git locally, you can
+> go back to your repo, resolve the git issues, and then push with the regular push command and `git push --tags`. This 
+> will cause all local commits and tags to be pushed to the server. 
 
 #### BUILD_ALLOW
 Enabling this bypasses all prompts `build.sh` should give, and auto-accepts everything. Setting this to `1` is the
