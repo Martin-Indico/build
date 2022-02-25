@@ -193,7 +193,12 @@ of this script is to simplify the way _Docker-Images_ are built and published. I
 updates project versions and commits the final result for _Git_ on a successful build.
 
 For the script to work properly you will have to follow the above project structure and versioning guidelines. With 
-your container-based project structured correctly, you download and configure the `.build.env` from this repo.
+your container-based project structured correctly, you download and configure the `.build.env` from this repo. 
+
+In addition to the dependencies mentioned below you will need a `Dockerfile` in the root of the repository for 
+`docker build` to work. This file is tested-working and included in alle container-based Indico projects as of 
+`25.02.22`, be careful when making changes to this file, changes made to the source code should not affect the 
+`Dockerfile` itself.
 
 ### Dependencies
 For `build.sh` to work correctly you will need a couple of system known commands and the official command-line tool from
@@ -269,6 +274,16 @@ From the help section above everything except `--help, --version` starting with 
 in the `.build.env` file, and it is recommended to set these there to ensure consistency across builds. Calling the
 script with `v` or `version` will display the current version and last updated date, while running it with `-v` or 
 `--version` will display only the version. 
+
+### Docker
+If any errors should occur related to the docker build-step, or something seems fishy after the build has completed,
+you can run the following command to remove all previously cached docker images:
+```shell
+docker rmi -f $(docker images -q -a)
+```
+
+If the errors persist try removing the latter `FROM` parts from the `Dockerfile`, run the above command again, and then
+try rebuilding the image.
 
 ### .build.env
 The `.build.env` file is an Indico-environment file read by `build.sh`. For every container-based project using 
@@ -380,13 +395,3 @@ the docker image is built. This allows you to run commands such as `yarn build` 
 new version name updated. Should the command or script placed here fail with an error `>= 1` will cause the `build.sh`
 to stop and exit with error code 1, when `BUIL_EXEC` is specified it will have to succeed for `build.sh` to complete.
 If you do not wish to use `BUILD_EXEC`, then remove it completely in the project `.build.env`.
-
-### Docker
-If any errors should appear related to the docker build-step, or something seems fishy after the build has completed, 
-you can run the following command to remove all previously cached docker images:
-```shell
-docker rmi -f $(docker images -q -a)
-```
-
-If the errors persist try removing the latter `FROM` parts from the `Dockerfile`, run the above command again, and then
-try rebuilding the image.
