@@ -381,25 +381,6 @@ new version name updated. Should the command or script placed here fail with an 
 to stop and exit with error code 1, when `BUIL_EXEC` is specified it will have to succeed for `build.sh` to complete.
 If you do not wish to use `BUILD_EXEC`, then remove it completely in the project `.build.env`.
 
-# Enables kubernetes deployment update with new image version
-BUILD_IMAGE_KUBER=1
-
-guidelines for good project structure mentioned above, this script capable of updating project versions, build it's 
-source-code, building a docker image of the `Dockerfile`
-
-```shell
-
-# Shared version update logic
-if [ "$BUILD_IMAGE_NODE" -eq 1 ]; then
-  echo "### Updating node version"
-  curr_date=$(date +"%Y-%m-%d") #Retrieves the current date
-  contents=$(jq --arg vs "$BUILD_IMAGE_VERSION" --arg date "$curr_date" '.version = $vs | .versionDate = $date' package.json) #Updates the new version in package json
-  echo "${contents}" >package.json
-  echo " - updated date and version in package.json"
-  echo " "
-fi
-```
-
 ### Docker
 If any errors should appear related to the docker build-step, or something seems fishy after the build has completed, 
 you can run the following command to remove all previously cached docker images:
